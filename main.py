@@ -5,6 +5,7 @@ import threading
 import queue
 from datetime import datetime
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 # Função para receber mensagens do servidor em uma thread separada
 def receive_messages(sock, messages_queue):
@@ -96,10 +97,13 @@ def main():
             ax.barh(dfConsolidado['EPC'], dfConsolidado['Quantidade']) #Formato Coluna horizontal
 
             # Definindo os rótulos dos eixos
-            ax.set_xlabel('EPC')
-            ax.set_ylabel('Quantidade')
+            ax.set_xlabel('Quantidade')
+            ax.set_ylabel('EPC')
+            # Configurando o eixo y para exibir apenas valores inteiros
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
             with placeholderChart.container():
+                st.subheader("Produtos lidos x Quantidade")
                 # Exibindo o gráfico no Streamlit
                 st.pyplot(fig)
                 #st.bar_chart(dfConsolidado)
