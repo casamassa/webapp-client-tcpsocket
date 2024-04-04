@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import socket
 import threading
 import queue
@@ -12,6 +13,7 @@ def receive_messages(sock, messages_queue):
             if not data:
                 break
             messages_queue.put((datetime.now().strftime("%d/%m/%Y %H:%M:%S"), data.decode()))
+            print(f"Msg do server: {data.decode()}")
         except Exception as e:
             print(f"Erro ao receber mensagem do servidor: {e}")
             break
@@ -29,7 +31,9 @@ def main():
         PORT = 14150  # Porta do servidor
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((HOST, PORT))
-        st.write("Conectado ao servidor de socket.")
+        st.write("Conectado ao servidor de socket: " + HOST + ":" + str(PORT))
+        # Cria um DataFrame vazio para armazenar as mensagens
+        df = pd.DataFrame(columns=['Data', 'Mensagem'])
     except Exception as e:
         st.error(f"Erro ao conectar ao servidor de socket: {e}")
         return
@@ -39,11 +43,15 @@ def main():
     receive_thread.start()
 
     # Exibe as mensagens recebidas em tempo real
-    st.write("Mensagens do servidor:")
+    st.write("Mensagens do socket:")
+    placeholder = st.empty()
     while True:
         try:
             ts, message = messages_queue.get(timeout=1)
-            st.write(f"Data: {ts}, {message}")
+            df.loc[len(df)] = [ts, message]  # Adiciona a mensagem ao DataFrame
+            with placeholder.container():
+                st.dataframe(df, use_container_width=True)
+            #st.write(f"Data: {ts}, {message}")
         except queue.Empty:
             pass
 
