@@ -4,6 +4,7 @@ import socket
 import threading
 import queue
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 # Função para receber mensagens do servidor em uma thread separada
 def receive_messages(sock, messages_queue):
@@ -56,11 +57,13 @@ def main():
     receive_thread = threading.Thread(target=receive_messages, args=(s, messages_queue))
     receive_thread.start()
 
-    tab1, tab2 = st.tabs(["Resumo", "EPC's"])
+    tab1, tab2, tab3 = st.tabs(["Resumo", "EPC's", "Gráfico"])
     with tab1:
         placeholderConsolidado = st.empty()
     with tab2:
         placeholder = st.empty()
+    with tab3:
+        placeholderChart = st.empty()
     
     while True:
         try:
@@ -85,6 +88,21 @@ def main():
             df.loc[len(df)] = [ts, columns[1], columns[0], columns[2]]  # Adiciona a mensagem ao DataFrame
             with placeholder.container():
                 st.dataframe(df, use_container_width=True, hide_index=True)
+
+            
+            # Criando o gráfico de barras
+            fig, ax = plt.subplots()
+            #ax.bar(dfConsolidado['EPC'], dfConsolidado['Quantidade']) #Formato Coluna vertical
+            ax.barh(dfConsolidado['EPC'], dfConsolidado['Quantidade']) #Formato Coluna horizontal
+
+            # Definindo os rótulos dos eixos
+            ax.set_xlabel('EPC')
+            ax.set_ylabel('Quantidade')
+
+            with placeholderChart.container():
+                # Exibindo o gráfico no Streamlit
+                st.pyplot(fig)
+                #st.bar_chart(dfConsolidado)
 
 
         except queue.Empty:
