@@ -6,6 +6,16 @@ import queue
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
+from pyepc import decode
+
+def rule_gs1_checksum(input_string):
+    sum_ = 0
+    for i in range(len(input_string)):
+        n = int(input_string[len(input_string) - 1 - i])
+        sum_ += n * 3 if i % 2 == 0 else n
+
+    result = 0 if sum_ % 10 == 0 else 10 - sum_ % 10
+    return result
 
 # Função para receber mensagens do servidor em uma thread separada
 def receive_messages(sock, messages_queue):
@@ -42,8 +52,8 @@ def main():
         st.write(status_text)
         
         # Cria um DataFrame vazio para armazenar as mensagens
-        df = pd.DataFrame(columns=['Data', 'EPC', 'Antena', 'RSSI'])
-        dfConsolidado = pd.DataFrame(columns=['EPC', 'Quantidade'])
+        df = pd.DataFrame(columns=['Data', 'EPC', 'GTIN', 'Serial Number', 'Antena', 'RSSI'])
+        dfConsolidado = pd.DataFrame(columns=['GTIN', 'Quantidade'])
     except Exception as e:
         # Define o emoji de bola vermelha
         red_ball_emoji = "\U0001F534"  # Unicode para o emoji de bola vermelha
@@ -74,31 +84,42 @@ def main():
             if len(columns) < 3:
                 continue
 
+            epc = columns[1]
+            antenna = columns[0]
+            rssi = columns[2]
+
+            sgtin_decoded = decode(epc)
+            serial_number = sgtin_decoded.serial_number
+            gtin = "0" + sgtin_decoded.company_prefix + "{:0>4}".format(sgtin_decoded.item_ref)
+            check_digit = rule_gs1_checksum(gtin)
+            gtin = gtin + str(check_digit)
+            gtin = gtin.lstrip('0')
+
             isNewRow = True
             # Percorrer as linhas existentes do DataFrame e atualizar uma coluna de uma linha específica
             for index, row in dfConsolidado.iterrows():
-                if row['EPC'] == columns[1]:  # Verifica se a linha tem o mesmo timestamp
+                if row['GTIN'] == gtin:  # Verifica se a linha tem o mesmo timestamp
                     dfConsolidado.at[index, 'Quantidade'] = row['Quantidade']+1  # Atualiza a coluna 'Mensagem' para a nova mensagem
                     isNewRow = False
             if isNewRow:
-                dfConsolidado.loc[len(df)] = [columns[1], 1]  # Adiciona a mensagem ao DataFrame
+                dfConsolidado.loc[len(df)] = [gtin, 1]  # Adiciona a mensagem ao DataFrame
             
             with placeholderConsolidado.container():
                 st.dataframe(dfConsolidado, use_container_width=True, hide_index=True)
             
-            df.loc[len(df)] = [ts, columns[1], columns[0], columns[2]]  # Adiciona a mensagem ao DataFrame
+            df.loc[len(df)] = [ts, epc, gtin, serial_number, antenna, rssi]  # Adiciona a mensagem ao DataFrame
             with placeholder.container():
                 st.dataframe(df, use_container_width=True, hide_index=True)
 
             
             # Criando o gráfico de barras
             fig, ax = plt.subplots()
-            #ax.bar(dfConsolidado['EPC'], dfConsolidado['Quantidade']) #Formato Coluna vertical
-            ax.barh(dfConsolidado['EPC'], dfConsolidado['Quantidade']) #Formato Coluna horizontal
+            #ax.bar(dfConsolidado['GTIN'], dfConsolidado['Quantidade']) #Formato Coluna vertical
+            ax.barh(dfConsolidado['GTIN'], dfConsolidado['Quantidade']) #Formato Coluna horizontal
 
             # Definindo os rótulos dos eixos
             ax.set_xlabel('Quantidade')
-            ax.set_ylabel('EPC')
+            ax.set_ylabel('GTIN')
             # Configurando o eixo y para exibir apenas valores inteiros
             ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
