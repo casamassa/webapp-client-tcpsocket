@@ -31,27 +31,62 @@ def main():
         PORT = 14150  # Porta do servidor
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((HOST, PORT))
-        st.write("Conectado ao servidor de socket: " + HOST + ":" + str(PORT))
+
+        # Define o emoji de bola verde
+        green_ball_emoji = "\U0001F7E2"  # Unicode para o emoji de bola verde
+        # Concatena o emoji com o texto
+        status_text = f"{green_ball_emoji} Conectado ao leitor: {HOST}:{PORT}"
+        # Exibe o texto com o emoji
+        st.write(status_text)
+        
         # Cria um DataFrame vazio para armazenar as mensagens
-        df = pd.DataFrame(columns=['Data', 'Mensagem'])
+        df = pd.DataFrame(columns=['Data', 'EPC', 'Antena', 'RSSI'])
+        dfConsolidado = pd.DataFrame(columns=['EPC', 'Quantidade'])
     except Exception as e:
-        st.error(f"Erro ao conectar ao servidor de socket: {e}")
+        # Define o emoji de bola vermelha
+        red_ball_emoji = "\U0001F534"  # Unicode para o emoji de bola vermelha
+        # Concatena o emoji com o texto
+        status_text = f"{red_ball_emoji} Não conectado ao leitor: {HOST}:{PORT}"
+        # Exibe o texto com o emoji
+        st.write(status_text)
+        st.error(f"Erro ao conectar ao leitor: {e}")
         return
 
     # Inicia a thread para receber mensagens do servidor
     receive_thread = threading.Thread(target=receive_messages, args=(s, messages_queue))
     receive_thread.start()
 
-    # Exibe as mensagens recebidas em tempo real
-    st.write("Mensagens do socket:")
-    placeholder = st.empty()
+    tab1, tab2 = st.tabs(["Resumo", "EPC's"])
+    with tab1:
+        placeholderConsolidado = st.empty()
+    with tab2:
+        placeholder = st.empty()
+    
     while True:
         try:
             ts, message = messages_queue.get(timeout=1)
-            df.loc[len(df)] = [ts, message]  # Adiciona a mensagem ao DataFrame
+
+            columns = message.split(',')
+            if len(columns) < 3:
+                continue
+
+            isNewRow = True
+            # Percorrer as linhas existentes do DataFrame e atualizar uma coluna de uma linha específica
+            for index, row in dfConsolidado.iterrows():
+                if row['EPC'] == columns[1]:  # Verifica se a linha tem o mesmo timestamp
+                    dfConsolidado.at[index, 'Quantidade'] = row['Quantidade']+1  # Atualiza a coluna 'Mensagem' para a nova mensagem
+                    isNewRow = False
+            if isNewRow:
+                dfConsolidado.loc[len(df)] = [columns[1], 1]  # Adiciona a mensagem ao DataFrame
+            
+            with placeholderConsolidado.container():
+                st.dataframe(dfConsolidado, use_container_width=True, hide_index=True)
+            
+            df.loc[len(df)] = [ts, columns[1], columns[0], columns[2]]  # Adiciona a mensagem ao DataFrame
             with placeholder.container():
-                st.dataframe(df, use_container_width=True)
-            #st.write(f"Data: {ts}, {message}")
+                st.dataframe(df, use_container_width=True, hide_index=True)
+
+
         except queue.Empty:
             pass
 
