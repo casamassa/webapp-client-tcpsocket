@@ -49,7 +49,7 @@ def receive_messages(sock, messages_queue):
 
 # Função principal
 def main():
-    st.set_page_config(layout="wide")
+    st.set_page_config(layout="wide", page_title="RFID - Portal")
 
     # Inicializa a fila para armazenar as mensagens recebidas
     messages_queue = queue.Queue()
@@ -58,7 +58,8 @@ def main():
 
     # Conecta ao servidor de socket
     try:
-        HOST = "127.0.0.1"  # Endereço IP do servidor
+        #HOST = "127.0.0.1"  # Endereço IP do servidor
+        HOST = "169.254.1.1"  # Endereço IP do leitor
         PORT = 14150  # Porta do servidor
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((HOST, PORT))
