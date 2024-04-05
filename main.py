@@ -7,6 +7,23 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from pyepc import decode
+import csv
+
+# Inicialize um dicionário vazio
+products_dictionary = {}
+
+def get_products_from_file():
+    # Open CSV file
+    with open('data.csv', newline='', encoding='utf-8') as csvfile:
+        # Create an object CSV reader
+        reader_csv = csv.reader(csvfile, delimiter=';')
+        
+        # Run line by line of CSV reader
+        for line_csv in reader_csv:
+            # Check if the line has 2 columns
+            if len(line_csv) == 2:
+                # Define the key of dictionary as first element of line and the value as second element of line
+                products_dictionary[line_csv[0]] = line_csv[1]
 
 def rule_gs1_checksum(input_string):
     sum_ = 0
@@ -37,6 +54,8 @@ def main():
     # Inicializa a fila para armazenar as mensagens recebidas
     messages_queue = queue.Queue()
 
+    get_products_from_file()
+
     # Conecta ao servidor de socket
     try:
         HOST = "127.0.0.1"  # Endereço IP do servidor
@@ -53,7 +72,7 @@ def main():
         
         # Cria um DataFrame vazio para armazenar as mensagens
         df = pd.DataFrame(columns=['Data', 'EPC', 'GTIN', 'Serial Number', 'Antena', 'RSSI'])
-        dfConsolidado = pd.DataFrame(columns=['GTIN', 'Quantidade'])
+        dfConsolidado = pd.DataFrame(columns=['Produto','GTIN', 'Quantidade'])
     except Exception as e:
         # Define o emoji de bola vermelha
         red_ball_emoji = "\U0001F534"  # Unicode para o emoji de bola vermelha
@@ -95,40 +114,43 @@ def main():
             gtin = gtin + str(check_digit)
             gtin = gtin.lstrip('0')
 
+            prod_desc = products_dictionary.get(gtin)
+            if prod_desc is None:
+                prod_desc = "GTIN não cadastrado"
+
             isNewRow = True
             # Percorrer as linhas existentes do DataFrame e atualizar uma coluna de uma linha específica
             for index, row in dfConsolidado.iterrows():
-                if row['GTIN'] == gtin:  # Verifica se a linha tem o mesmo timestamp
-                    dfConsolidado.at[index, 'Quantidade'] = row['Quantidade']+1  # Atualiza a coluna 'Mensagem' para a nova mensagem
+                if row['GTIN'] == gtin:  # Check if the line has the same gtin
+                    dfConsolidado.at[index, 'Quantidade'] = row['Quantidade']+1  # Refresh the column Quantidade
                     isNewRow = False
             if isNewRow:
-                dfConsolidado.loc[len(df)] = [gtin, 1]  # Adiciona a mensagem ao DataFrame
+                dfConsolidado.loc[len(df)] = [prod_desc,gtin, 1]  # Add the line to DataFrame
             
             with placeholderConsolidado.container():
                 st.dataframe(dfConsolidado, use_container_width=True, hide_index=True)
             
-            df.loc[len(df)] = [ts, epc, gtin, serial_number, antenna, rssi]  # Adiciona a mensagem ao DataFrame
+            df.loc[len(df)] = [ts, epc, gtin, serial_number, antenna, rssi]  # Add the line to DataFrame
             with placeholder.container():
                 st.dataframe(df, use_container_width=True, hide_index=True)
 
             
-            # Criando o gráfico de barras
+            # Create the chart bar
             fig, ax = plt.subplots()
-            #ax.bar(dfConsolidado['GTIN'], dfConsolidado['Quantidade']) #Formato Coluna vertical
-            ax.barh(dfConsolidado['GTIN'], dfConsolidado['Quantidade']) #Formato Coluna horizontal
+            #ax.bar(dfConsolidado['Produto'], dfConsolidado['Quantidade']) #Format column in vertical
+            ax.barh(dfConsolidado['Produto'], dfConsolidado['Quantidade']) #Format column in horizontal
 
-            # Definindo os rótulos dos eixos
+            # Define axis labels
             ax.set_xlabel('Quantidade')
-            ax.set_ylabel('GTIN')
-            # Configurando o eixo y para exibir apenas valores inteiros
+            ax.set_ylabel('Produto')
+            # Set axis y to display only integer value range
             ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
             with placeholderChart.container():
                 st.subheader("Produtos lidos x Quantidade")
-                # Exibindo o gráfico no Streamlit
+                # Display the chart on Streamlit
                 st.pyplot(fig)
                 #st.bar_chart(dfConsolidado)
-
 
         except queue.Empty:
             pass
